@@ -1,0 +1,19 @@
+import os
+import json
+from fastapi.testclient import TestClient
+import sys
+sys.path.append(os.path.abspath("backend"))
+from main import app
+
+client = TestClient(app)
+
+def test_create_and_get_plan():
+    res = client.post("/api/plan", json={"goal":"Launch a product in 2 weeks"})
+    assert res.status_code == 200
+    body = res.json()
+    assert "plan_id" in body and "plan" in body
+    pid = body["plan_id"]
+    res2 = client.get(f"/api/plan/{pid}")
+    assert res2.status_code == 200
+    plan = res2.json()
+    assert plan["goal"].startswith("Launch")
