@@ -1,0 +1,100 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+import uuid
+from datetime import datetime, date, timedelta
+import os
+import json
+
+app = FastAPI(title="Smart Task Planner API")
+
+class PlanRequest(BaseModel):
+    goal: str
+    deadline: Optional[date] = None
+
+STORAGE_DIR = os.getenv("PLANS_DIR", "./plans")
+os.makedirs(STORAGE_DIR, exist_ok=True)
+
+def llm_generate_plan(goal: str, deadline: Optional[date]):
+    # ======= Stub: deterministic plan for assignment/demo ========
+    now = datetime.utcnow().date()
+    plan_id = str(uuid.uuid4())
+    tasks = []
+    tasks.append({
+        "id": "t1",
+        "title": "Clarify scope & success criteria",
+        "description": "Define what 'launch' means and key success metrics.",
+        "duration_days": 1,
+        "depends_on": [],
+        "priority": "high",
+        "suggested_start_date": str(now),
+        "suggested_end_date": str(now)
+    })
+    tasks.append({
+        "id": "t2",
+        "title": "Design basic UI & UX",
+        "description": "Create low-fidelity screens and approval.",
+        "duration_days": 1,
+        "depends_on": ["t1"],
+        "priority": "high",
+        "suggested_start_date": str(now + timedelta(days=1)),
+        "suggested_end_date": str(now + timedelta(days=1))
+    })
+    tasks.append({
+        "id": "t3",
+        "title": "Build MVP backend",
+        "description": "Implement core backend endpoints and data model.",
+        "duration_days": 4,
+        "depends_on": ["t2"],
+        "priority": "high",
+        "suggested_start_date": str(now + timedelta(days=2)),
+        "suggested_end_date": str(now + timedelta(days=5))
+    })
+    tasks.append({
+        "id": "t4",
+        "title": "Build MVP frontend",
+        "description": "Implement core UI flows for the MVP.",
+        "duration_days": 3,
+        "depends_on": ["t3"],
+        "priority": "high",
+        "suggested_start_date": str(now + timedelta(days=3)),
+        "suggested_end_date": str(now + timedelta(days=5))
+    })
+    tasks.append({
+        "id": "t5",
+        "title": "QA & smoke test",
+        "description": "Smoke tests and quick bug fixes.",
+        "duration_days": 1,
+        "depends_on": ["t4"],
+        "priority": "medium",
+        "suggested_start_date": str(now + timedelta(days=6)),
+        "suggested_end_date": str(now + timedelta(days=6))
+    })
+    plan = {
+        "plan_id": plan_id,
+        "goal": goal,
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "deadline": str(deadline) if deadline else None,
+        "overall_confidence": 0.85,
+        "tasks": tasks,
+        "reasoning": "Assumes single full-stack developer, minimal external dependencies, and that the deadline is reasonable."
+    }
+    return plan
+
+@app.post("/api/plan")
+def create_plan(req: PlanRequest):
+    if not req.goal or len(req.goal.strip()) < 5:
+        raise HTTPException(status_code=400, detail="Provide a longer goal description.")
+    plan = llm_generate_plan(req.goal, req.deadline)
+    fname = os.path.join(STORAGE_DIR, f"{plan['plan_id']}.json")
+    with open(fname, "w") as f:
+        json.dump(plan, f, indent=2)
+    return {"plan_id": plan["plan_id"], "plan": plan}
+
+@app.get("/api/plan/{plan_id}")
+def get_plan(plan_id: str):
+    fname = os.path.join(STORAGE_DIR, f"{plan_id}.json")
+    if not os.path.exists(fname):
+        raise HTTPException(status_code=404, detail="Plan not found.")
+    with open(fname) as f:
+        return json.load(f)
