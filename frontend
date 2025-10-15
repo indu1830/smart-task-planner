@@ -1,0 +1,61 @@
+import React, { useState } from "react";
+
+export default function SmartPlannerDemo() {
+  const [goal, setGoal] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [plan, setPlan] = useState(null);
+  const [error, setError] = useState(null);
+
+  async function submitGoal(e) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const body = { goal, deadline: deadline || undefined };
+      const res = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "API error");
+      setPlan(data.plan);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="p-4 max-w-2xl mx-auto">
+      <h2 className="text-xl font-bold mb-2">Smart Task Planner — Demo</h2>
+      <form onSubmit={submitGoal} className="mb-4">
+        <textarea value={goal} onChange={e=>setGoal(e.target.value)} placeholder="Enter goal e.g. 'Launch product in 2 weeks'" className="w-full p-2 border rounded mb-2" rows={3}/>
+        <input type="date" value={deadline} onChange={e=>setDeadline(e.target.value)} className="p-2 border rounded mb-2"/>
+        <div>
+          <button disabled={loading} className="px-3 py-1 rounded bg-blue-600 text-white">{loading ? "Working..." : "Generate Plan"}</button>
+        </div>
+      </form>
+      {error && <div className="text-red-600">{error}</div>}
+      {plan && (
+        <div>
+          <h3 className="font-semibold">Plan for: {plan.goal}</h3>
+          <div className="text-sm text-gray-600 mb-2">Generated: {plan.generated_at}</div>
+          <ul className="space-y-2">
+            {plan.tasks.map(task => (
+              <li key={task.id} className="p-2 border rounded">
+                <div className="font-semibold">{task.title} <span className="text-xs text-gray-500">({task.duration_days}d)</span></div>
+                <div className="text-sm">{task.description}</div>
+                <div className="text-xs text-gray-500">Depends on: {task.depends_on.join(", ") || "—"}</div>
+                <div className="text-xs text-gray-500">Dates: {task.suggested_start_date} → {task.suggested_end_date}</div>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 text-sm text-gray-700">Reasoning: {plan.reasoning}</div>
+        </div>
+      )}
+    </div>
+  );
+}
